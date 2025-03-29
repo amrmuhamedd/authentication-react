@@ -1,7 +1,7 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { tokenService } from './tokenService';
 
-const API_BASE_URL = import.meta.env.VITE_ENV_API_BASE_URL || 'http://localhost:3000/';
+const API_BASE_URL = import.meta.env.VITE_ENV_API_BASE_URL;
 
 // Extend AxiosRequestConfig to include a `_retry` property
 interface CustomAxiosRequestConfig extends InternalAxiosRequestConfig {
@@ -16,24 +16,8 @@ const api = axios.create({
   },
 });
 
-// Request interceptor for adding auth token and organization
-api.interceptors.request.use(
-  (config) => {
-    const token = tokenService.getAccessToken();
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    
-    // Add organization ID to requests if available
-    const organizationId = localStorage.getItem('selectedOrganizationId');
-    if (organizationId) {
-      config.headers['X-Organization-ID'] = organizationId;
-    }
-    
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
+
+
 
 // Response interceptor for handling token refresh and retries
 api.interceptors.response.use(
