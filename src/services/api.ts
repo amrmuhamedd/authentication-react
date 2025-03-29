@@ -3,7 +3,6 @@ import { tokenService } from './tokenService';
 
 const API_BASE_URL = import.meta.env.VITE_ENV_API_BASE_URL;
 
-// Extend AxiosRequestConfig to include a `_retry` property
 interface CustomAxiosRequestConfig extends InternalAxiosRequestConfig {
   _retry?: boolean;
   _retryCount?: number;
@@ -16,9 +15,6 @@ const api = axios.create({
   },
 });
 
-
-
-
 // Response interceptor for handling token refresh and retries
 api.interceptors.response.use(
   (response) => response,
@@ -28,14 +24,21 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
+    // Handle network errors (CORS issues)
+    if (!error.response) {
+      console.error('Network error or CORS issue:', error.message);
+      return Promise.reject(error);
+    }
+
     // Handle 401 errors with token refresh
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if (error.response.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
       try {
         const newAccessToken = await tokenService.refreshTokens();
         originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
         return api(originalRequest);
       } catch (refreshError: any) {
+        console.error('Token refresh failed:', refreshError);
         if (refreshError.response?.status === 401) {
           tokenService.clearTokens();
           window.location.href = '/login';
@@ -51,7 +54,7 @@ api.interceptors.response.use(
     if (shouldRetry) {
       originalRequest._retryCount = originalRequest._retryCount ?? 0;
       const maxRetries = 2;
-      const retryDelay = 1000; // Delay in milliseconds
+      const retryDelay = 1000; // 1 second
 
       if (originalRequest._retryCount < maxRetries) {
         originalRequest._retryCount += 1;
