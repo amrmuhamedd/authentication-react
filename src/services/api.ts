@@ -1,0 +1,85 @@
+import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
+import { tokenService } from './tokenService';
+
+const API_BASE_URL = import.meta.env.VITE_ENV_API_BASE_URL || 'http://localhost:3000/';
+
+// Extend AxiosRequestConfig to include a `_retry` property
+interface CustomAxiosRequestConfig extends InternalAxiosRequestConfig {
+  _retry?: boolean;
+  _retryCount?: number;
+}
+
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Request interceptor for adding auth token and organization
+api.interceptors.request.use(
+  (config) => {
+    const token = tokenService.getAccessToken();
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    
+    // Add organization ID to requests if available
+    const organizationId = localStorage.getItem('selectedOrganizationId');
+    if (organizationId) {
+      config.headers['X-Organization-ID'] = organizationId;
+    }
+    
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// Response interceptor for handling token refresh and retries
+api.interceptors.response.use(
+  (response) => response,
+  async (error: AxiosError) => {
+    const originalRequest = error.config as CustomAxiosRequestConfig;
+    if (!originalRequest) {
+      return Promise.reject(error);
+    }
+
+    // Handle 401 errors with token refresh
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+      try {
+        const newAccessToken = await tokenService.refreshTokens();
+        originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+        return api(originalRequest);
+      } catch (refreshError: any) {
+        if (refreshError.response?.status === 401) {
+          tokenService.clearTokens();
+          window.location.href = '/login';
+        }
+        return Promise.reject(refreshError);
+      }
+    }
+
+    // Retry mechanism for network errors or 5xx responses
+    const shouldRetry =
+      !error.response || (error.response.status >= 500 && error.response.status < 600);
+
+    if (shouldRetry) {
+      originalRequest._retryCount = originalRequest._retryCount ?? 0;
+      const maxRetries = 2;
+      const retryDelay = 1000; // Delay in milliseconds
+
+      if (originalRequest._retryCount < maxRetries) {
+        originalRequest._retryCount += 1;
+        await new Promise((resolve) => setTimeout(resolve, retryDelay));
+        return api(originalRequest);
+      }
+    }
+
+    return Promise.reject(error);
+  }
+);
+
+export const isOnline = (): boolean => navigator.onLine;
+
+export default api;
