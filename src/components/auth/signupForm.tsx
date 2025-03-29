@@ -39,9 +39,6 @@ export const SignupForm = () => {
     name: string;
   }) => {
     const resultAction = await dispatch(registerUser(values));
-
-   console.log(resultAction);
-    
     if (registerUser.fulfilled.match(resultAction)) {
       notification.success({
         message: "Registration Successful",

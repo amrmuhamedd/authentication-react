@@ -9,6 +9,7 @@ import { useSelector } from "react-redux";
 import { RootState } from "./store/store";
 import LoadingScreen from "./components/LoadingScreen";
 import Dashboard from "./pages/protected";
+import { Login } from "./pages/login";
 
 const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   const authState = useSelector((state: RootState) => state.auth);
@@ -18,7 +19,7 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   }
 
   if (!authState.isAuthenticated) {
-    return <Navigate to={`/signup`} replace />;
+    return <Navigate to={`/login`} replace />;
   }
 
   return <>{children}</>;
@@ -28,6 +29,12 @@ function App() {
   return (
     <Router>
       <Routes>
+      <Route
+          path="/login"
+          element={
+              <Login />
+          }
+        />
         <Route path="/signup" element={<Signup />} />
         <Route
           path="/"
